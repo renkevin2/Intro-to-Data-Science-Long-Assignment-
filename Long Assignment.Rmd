@@ -102,7 +102,7 @@ revGrowth <- c(rep(0.06, 7), rep(0.03, 3)) # revenue growth
 ebitMargin.future <- c(rep(ebitMargin, 10)) # EBIT margin stays the same
 capExGrowth <- c(rep(0.06, 5), rep(0.03, 5)) # capEx growth 
 deprGrowth <- c(rep(0.06, 6), rep(0.03, 4)) # deprecation growth 
-nwcTime <- c(rep(nwc, 10)) # nwc % of revenue over time 
+nwcTime <- c(rep(nwc, 10)) # nwcc % of revenue over time 
 
 projection <- function(start, growth.path) {
   path <- start * cumprod(1 + growth.path) # gives the vector of the projected financial line item
