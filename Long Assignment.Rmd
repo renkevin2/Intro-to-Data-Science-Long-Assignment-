@@ -1,0 +1,154 @@
+---
+title: "250743789_Long_Assignment"
+author: "Kevin Ren"
+date: "March 2, 2017"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# DCF Function
+
+This program is designed to output a DCF with several input assumptions such as WACC and future operations. 
+
+## Initial Inputs and WACC
+
+In the first section, the initial inputs will be entered and WACC will be calculated. For this section, initial assumptions include shares outstanding, the current share price, market value of debt, the number of years in the projection period, cost of debt, marginal tax rate, beta, risk-free rate, and expected market return. 
+
+```{r WACC}
+shares <- 1000000 # shares outstanding
+currentPrice <- 1 # current share price
+mDebt <- 500000 # mv of debt
+term <- 10 # 10 year projection
+
+Kd <- 0.05 # Cost of debt
+taxRate <- 0.35 # tax rate
+beta <- 1.25 # beta
+rf <- 0.025 # risk-free rate
+rm <- 0.10 # expected market return
+
+```
+
+## WACC & Beta Projections 
+
+Since it is possible that WACC changes over time, we will create a vector containing these projections. It is assumed the only changing variable will be the beta. In the beta.future function, there are three arguments: beta, years of stable beta (`cap`), and the projection length in year (`term`). 
+
+If cap is greater than term than it is assumed that beta is constant throughout. If term is greater than cap then during the first cap years it will be constant and then it will trend to 1 by the end of the projection period in equal arithmetic steps. 
+
+We only use the second number of the `seq` output because the first term is the same as the starting beta and we assumed that this year it will trend down, so the number of steps for this will be `term` - `cap` + 1 but we will not use the first term. 
+
+```{r WACC Projections, echo=FALSE}
+beta.future <- function(beta, cap, term) {
+  if (term < cap) { # if it is decided that the trend to 1 will happen beyond the projection, then keep it the same
+    beta.project <- c(rep(beta, term))
+    return(beta.project)
+  } else {
+    beta.project <- c(rep(beta, cap), seq(beta, 1, length.out =  (term - cap + 1))[2:(term - cap + 1)]) # it will reach 1 by the end of the projection period
+    return(beta.project)
+  }
+}
+
+beta.project <- beta.future(beta, 5, term) # we assume five years for cap
+
+```
+
+The function to calculate future WACC takes on the following arguments: market value of debt, numbers of shares outstanding, current share price, cost of debt, marginal tax rate, beta over time, risk-free rate, and the expected market return. 
+
+We will assume the weights of debt and equity, risk free weight, and expected market return remain constant through the projection period. Since in the function the argument `beta` is a vector and will be the output from `beta.future`, it is a vector of size `term`.
+
+```{r WACC projections}
+
+wacc.calc <- function(mDebt, shares, currentPrice, Kd, taxRate, beta, rf, rm){ # we will assume weights and cost of debt remain constant
+  mEquity <- shares * currentPrice 
+  wDebt <- mDebt / (mEquity + mDebt)
+  wEquity <- mEquity / (mEquity + mDebt)
+  wacc <- wDebt * Kd * (1 - taxRate) + wEquity * (rf + beta * (rm - rf))
+  return(wacc)
+}
+
+wacc.project <- wacc.calc(mDebt, shares, currentPrice, Kd, taxRate, beta.project, rf, rm)
+```
+
+## Operational Assumptions
+
+The current year operational figures including revenue, EBIT margin, depreciation, capital expenditures, and net working capital change (NWCC) as a percent of revenue are below. Also the perpetual growth assumption for the Gordon Growth method for terminal calculation is included. 
+
+```{r Operational Assumptions}
+# Operational assumptions
+
+revenues <- 1000000 # current year revenues
+ebitMargin <- 0.25 # EBIT margins
+depreciation <- 50000 # depreciation 
+capEx <- 65000 # capEx 
+nwc <- 0.01 # net change in working capital % of revenue
+g <- 0.02 # terminal growth
+
+```
+
+The growth and margin assumptions for the projection years will be put into their respective vectors. For this example, we assume revenue growth is 6% for the first seven years and 3% for the remaining three years. EBIT margin and NWC as a % of revenue remain constant. Capital expenditures will grow at 6% for five years and 3% for the next five years. Finally, depreciation will grow at 6% for six years and 3% for the remaining four years. 
+
+The `projection` function takes the initial value of a financial metric as an argument and then takes the growth path vector we have already inputted as the second argument. This function outputs a vector, the size of `term`, with the actual projected financial figures for revenue, capital expenditures, and depreciation. Since EBIT and NWCC are a proportion of revenue, by projecting revenues we already have the necessary components for the projected EBIT and NWCC. 
+
+```{r Operational Projections}
+
+# Projected figures/assumptions
+
+revGrowth <- c(rep(0.06, 7), rep(0.03, 3)) # revenue growth 
+ebitMargin.future <- c(rep(ebitMargin, 10)) # EBIT margin stays the same
+capExGrowth <- c(rep(0.06, 5), rep(0.03, 5)) # capEx growth 
+deprGrowth <- c(rep(0.06, 6), rep(0.03, 4)) # deprecation growth 
+nwcTime <- c(rep(nwc, 10)) # nwc % of revenue over time 
+
+projection <- function(start, growth.path) {
+  path <- start * cumprod(1 + growth.path) # gives the vector of the projected financial line item
+  return(path)
+}
+
+revenue.projection <- projection(revenues, revGrowth) # revenue projection vector
+capex.projection <- projection(capEx, capExGrowth) # capex projection vector
+depr.projection <- projection(depreciation, deprGrowth) # depreciation projection vector
+
+```
+
+## DCF Function
+
+The DCF function built takes on the following arguments: projected revenues, projected EBIT margins, marginal tax rate, projected capital expenditures, projected depreciation, projected NWCC as a % of revenue, projected WACC, terminal growth, projection period length, market value of debt, and shares outstanding. 
+
+First unlevered free cash flows (UFCF) are calculated and a vector is produced for the projected UFCF. The present value of the UFCF is calculated by dividing the values of the UFCF vector by the respective cumulative product of 1 + WACC, as this is the approriate discount factor. 
+
+The terminal value is calculated via the Gordon Growth method. The last entry of the UFCF vector is used and the last entry of the WACC vector is used. This converted to present value by taking the last value of the cumulative product entry of 1 + WACC. 
+
+The sum of the present value UFCF vector and the terminal value is the enterprise value. The equity value is found by taking the enterprise value and subtracting the market value of debt. We assume no excess cash or other types of capital such as preferred shares. Fair value per share is calculated by dividing equity value by shares outstanding. 
+
+```{r DCF}
+
+fairvalue <- function(revenue, ebitmargin, t, capex, depr, nwc, wacc, g, term, mdebt, shares) {
+  fcf <- revenue * ebitmargin * (1 - t) -  capex + depr - nwc * revenue # get unlevered fcf
+  pvfcf <- fcf / cumprod(1 + wacc) # present value unlevered fcf vector
+  terminal <- fcf[term] * (1 + g) / (wacc[term] - g) # terminal value using the Gordon Growth method
+  enterprise.value <- sum(pvfcf) + terminal / cumprod(1 + wacc)[term] # add the present values together
+  equity.value <- enterprise.value - mdebt # take out the mv of debt from the ev
+  fair.value <- equity.value / shares # get the per share value
+  return(fair.value)
+}
+
+fair.value <- fairvalue(revenue.projection, ebitMargin.future, taxRate, capex.projection, depr.projection, 
+                        nwcTime, wacc.project, g, term, mDebt, shares)
+
+print(fair.value)
+
+margin <- function(fairvalue, currentprice) {
+  margin.safety <- 1 - currentprice / fairvalue
+  return(margin.safety)
+}
+
+margin.of.safety <- margin(fair.value, currentPrice)
+print(margin.of.safety)
+
+```
+
