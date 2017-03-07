@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # DCF Function
 
-This program is designed to output a DCF with several input assumptions such as WACC and future operations. 
+This program is designed to output a DCF with several input assumptions such as WACC and future operations. The example below uses random inputs and assumptions for demonstration purposes. 
 
 ## Initial Inputs and WACC
 
@@ -36,11 +36,11 @@ rm <- 0.10 # expected market return
 
 ## WACC & Beta Projections 
 
-Since it is possible that WACC changes over time, we will create a vector containing these projections. It is assumed the only changing variable will be the beta. In the beta.future function, there are three arguments: beta, years of stable beta (`cap`), and the projection length in year (`term`). 
+Since it is possible that WACC changes over time, we will create a vector containing these projections. It is assumed the only changing variable will be the beta. In the `beta.future` function, there are three arguments: beta, years of stable beta (`cap`), and the projection length in years (`term`). 
 
-If cap is greater than term than it is assumed that beta is constant throughout. If term is greater than cap then during the first cap years it will be constant and then it will trend to 1 by the end of the projection period in equal arithmetic steps. 
+If `cap` is greater than `term` than it is assumed that the beta is constant throughout. If `term` is greater than `cap` then during the first `cap` years it will be constant and then it will trend to 1 by the end of the projection period in equal arithmetic steps. 
 
-We only use the second number of the `seq` output because the first term is the same as the starting beta and we assumed that this year it will trend down, so the number of steps for this will be `term` - `cap` + 1 but we will not use the first term. 
+We exclude the first number of the `seq` output because the first term is the same as the starting beta and we assumed that this year it will trend down. Thus, the number of steps for this will be `term` - `cap` + 1 as we will not use the first term. 
 
 ```{r WACC Projections, echo=FALSE}
 beta.future <- function(beta, cap, term) {
@@ -59,7 +59,7 @@ beta.project <- beta.future(beta, 5, term) # we assume five years for cap
 
 The function to calculate future WACC takes on the following arguments: market value of debt, numbers of shares outstanding, current share price, cost of debt, marginal tax rate, beta over time, risk-free rate, and the expected market return. 
 
-We will assume the weights of debt and equity, risk free weight, and expected market return remain constant through the projection period. Since in the function the argument `beta` is a vector and will be the output from `beta.future`, it is a vector of size `term`.
+We will assume the weights of debt and equity, risk free weight, and expected market return remain constant through the projection period. Since in the function the argument `beta` is a vector and will be the output from `beta.future` function, it is a vector of size `term`.
 
 ```{r WACC projections}
 
@@ -76,7 +76,7 @@ wacc.project <- wacc.calc(mDebt, shares, currentPrice, Kd, taxRate, beta.project
 
 ## Operational Assumptions
 
-The current year operational figures including revenue, EBIT margin, depreciation, capital expenditures, and net working capital change (NWCC) as a percent of revenue are below. Also the perpetual growth assumption for the Gordon Growth method for terminal calculation is included. 
+The current year operational figures including revenue, EBIT margin, depreciation, capital expenditures, and net working capital change (NWCC) as a percent of revenue are below. Also the perpetual growth assumption for the Gordon Growth method for the terminal calculation is included. 
 
 ```{r Operational Assumptions}
 # Operational assumptions
@@ -90,7 +90,7 @@ g <- 0.02 # terminal growth
 
 ```
 
-The growth and margin assumptions for the projection years will be put into their respective vectors. For this example, we assume revenue growth is 6% for the first seven years and 3% for the remaining three years. EBIT margin and NWC as a % of revenue remain constant. Capital expenditures will grow at 6% for five years and 3% for the next five years. Finally, depreciation will grow at 6% for six years and 3% for the remaining four years. 
+The growth and margin assumptions for the projection years will be put into their respective vectors. For this example, we assume revenue growth is 6% for the first seven years and 3% for the remaining three years. EBIT margin and NWCC as a % of revenue remain constant. Capital expenditures will grow at 6% for five years and 3% for the next five years. Finally, depreciation will grow at 6% for six years and 3% for the remaining four years. 
 
 The `projection` function takes the initial value of a financial metric as an argument and then takes the growth path vector we have already inputted as the second argument. This function outputs a vector, the size of `term`, with the actual projected financial figures for revenue, capital expenditures, and depreciation. Since EBIT and NWCC are a proportion of revenue, by projecting revenues we already have the necessary components for the projected EBIT and NWCC. 
 
@@ -119,7 +119,7 @@ depr.projection <- projection(depreciation, deprGrowth) # depreciation projectio
 
 The DCF function built takes on the following arguments: projected revenues, projected EBIT margins, marginal tax rate, projected capital expenditures, projected depreciation, projected NWCC as a % of revenue, projected WACC, terminal growth, projection period length, market value of debt, and shares outstanding. 
 
-First unlevered free cash flows (UFCF) are calculated and a vector is produced for the projected UFCF. The present value of the UFCF is calculated by dividing the values of the UFCF vector by the respective cumulative product of 1 + WACC, as this is the approriate discount factor. 
+First unlevered free cash flows (UFCF) are calculated and a vector is produced for the projected UFCF. The present value of the UFCFs is calculated by dividing the values of the UFCF vector by the respective cumulative product of 1 + WACC, as this is the approriate discount factor. 
 
 The terminal value is calculated via the Gordon Growth method. The last entry of the UFCF vector is used and the last entry of the WACC vector is used. This converted to present value by taking the last value of the cumulative product entry of 1 + WACC. 
 
@@ -142,6 +142,16 @@ fair.value <- fairvalue(revenue.projection, ebitMargin.future, taxRate, capex.pr
 
 print(fair.value)
 
+```
+
+## Margin of Safety
+
+Finally, we determine the margin of safety. The `margin` function takes on the fair value and original share price as arguments. 
+
+The margin of safety is determined by 1 - original share price / fair value. 
+
+```{r Margin of Safety}
+
 margin <- function(fairvalue, currentprice) {
   margin.safety <- 1 - currentprice / fairvalue
   return(margin.safety)
@@ -151,4 +161,3 @@ margin.of.safety <- margin(fair.value, currentPrice)
 print(margin.of.safety)
 
 ```
-
